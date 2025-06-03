@@ -2,9 +2,9 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const readline = require("readline");
 
-const engieReader = require("./engieReader");
-const qfReader = require("./qfReader");
-const reromReader = require("./reromReader");
+const engieReader = require("./engie_reader");
+const qfReader = require("./qf_reader");
+const reromReader = require("./rerom_reader");
 
 const rl = readline.createInterface({
   input: process.stdin,
