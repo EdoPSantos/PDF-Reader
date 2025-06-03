@@ -2,7 +2,7 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 
 // Caminho para o PDF atual
-const pathPDF = "../pdf_reader/QF 25_0001037.pdf";
+const pathPDF = "../pdf_reader/opcao3.Pdf";
 const buffer = fs.readFileSync(pathPDF);
 
 pdfParse(buffer).then(function (data) {
@@ -12,16 +12,23 @@ pdfParse(buffer).then(function (data) {
     .map((l) => l.trim())
     .filter((l) => l !== "");
 
-    //console.log("\n--- Conteúdo do PDF (linhas) ---\n");
-    //console.log(lines.join("\n"));
-    //console.log("\n--- Fim do conteúdo ---\n");
+    console.log("\n--- Conteúdo do PDF (linhas) ---\n");
+    console.log(lines.join("\n"));
+    console.log("\n--- Fim do conteúdo ---\n");
 
   const results = [];
 
   const compactItemRegex = /^(\d{5})(\d{8})([A-ZÇÁÉÍÓÚÀÃÕ\-\s0-9]+?)(\d+)(UN|un|kg|pcs)(\d{4}-\d{2}-\d{2})$/;
   const fusedLineRegex = /^(\d{5})(\d{1,3}),\d{2}(un|kg|pcs)(\d{1,3}),\d{2}(\d{1,3}),\d{2}(\d{3})\s*-\s*(.+?)\s*-\s*(\d{2}\/\d{2}\/\d{4})$/i;
-
-
+  
+  const reromBlockPattern = [
+    /^\d{1,3},\d{3}$/,     // Quantidade (ex: 21,001)
+    /^[A-Z]{2}$/,          // Prefixo (ex: OB)
+    /^\d{3,5}$/,           // Destino (ex: 2687)
+    /^.+$/,                // Designação (ex: HASCO)
+    /^.+$/,                // Especificações (ex: 2-014(Viton))
+    /^.+$/,                // Peça/Ref (ex: O'ring (710))
+  ];
 
   const STOP_WORDS = [
     "Item", "Material", "Descrição", "Solicitação", "ENGIE",
@@ -109,6 +116,63 @@ pdfParse(buffer).then(function (data) {
     prevLine = "";
     continue;
     }
+
+    // 3. Layout REROM (bloco de 6 linhas seguidas)
+    const block = lines.slice(i, i + 6);
+    const isRerom = block.length === 6 && block.every((line, idx) => reromBlockPattern[idx].test(line));
+
+    if (isRerom) {
+      const [quantityRaw, prefix, destination, designationRaw, specsRaw, partRefRaw] = block;
+
+      // Separar quantidade e número do item
+      const quantityMatch = quantityRaw.match(/^(\d{1,3}),(\d{3})$/);
+      if (!quantityMatch) continue;
+
+      const quantity = parseInt(quantityMatch[1], 10);           // ex: 21
+      const itemNumber = parseInt(quantityMatch[2], 10);          // ex: 001 → 1
+
+      let designation = designationRaw.trim();
+      let specifications = specsRaw.trim();
+
+      // Se a designação estiver colada com os números (ex: ISO4762), não separar
+      if (/^[A-Z]+\d+$/.test(designation)) {
+        // Está tudo em designação (ex: ISO4762)
+        // Mantém `specifications` como está
+      } else {
+        // Caso contrário, tenta dividir se for apropriado
+        const parts = designation.split(/\s+|-/);
+        if (parts.length > 1 && /^[A-Z]+$/.test(parts[0])) {
+          designation = parts[0].trim();
+          specifications = parts.slice(1).join(" ").trim();
+        }
+      }
+
+
+      // Extrair Parts e Reference
+      let parts = partRefRaw.trim();
+      let reference = null;
+
+      const refMatch = partRefRaw.match(/^(.+?)\s*\(?(\d+)\)?$/);
+      if (refMatch) {
+        parts = refMatch[1].trim();
+        reference = `(${refMatch[2]})`;
+      }
+
+      results.push({
+        "Item Number": itemNumber,
+        Destiny: destination,
+        Quantity: quantity,
+        Designation: designation,
+        Specifications: specifications,
+        Parts: parts,
+        Reference: reference
+      });
+
+      i += 5;
+      prevLine = "";
+      continue;
+    }
+
 
     if (
       !line.match(/^\d{5}/) &&
