@@ -2,7 +2,7 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 
 // Caminho para o PDF atual
-const pathPDF = "../pdf_reader/opcao3.Pdf";
+const pathPDF = "../test_pdfs/opcao3.PDF";
 const buffer = fs.readFileSync(pathPDF);
 
 pdfParse(buffer).then(function (data) {
@@ -22,12 +22,12 @@ pdfParse(buffer).then(function (data) {
   const fusedLineRegex = /^(\d{5})(\d{1,3}),\d{2}(un|kg|pcs)(\d{1,3}),\d{2}(\d{1,3}),\d{2}(\d{3})\s*-\s*(.+?)\s*-\s*(\d{2}\/\d{2}\/\d{4})$/i;
   
   const reromBlockPattern = [
-    /^\d{1,3},\d{3}$/,     // Quantidade (ex: 21,001)
-    /^[A-Z]{2}$/,          // Prefixo (ex: OB)
-    /^\d{3,5}$/,           // Destino (ex: 2687)
-    /^.+$/,                // Designação (ex: HASCO)
-    /^.+$/,                // Especificações (ex: 2-014(Viton))
-    /^.+$/,                // Peça/Ref (ex: O'ring (710))
+    /^\d{1,3},\d{3}$/,     
+    /^[A-Z]{2}$/,          
+    /^\d{3,5}$/,           
+    /^.+$/,              
+    /^.+$/,                
+    /^.+$/,                
   ];
 
   const STOP_WORDS = [

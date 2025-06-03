@@ -12,9 +12,9 @@ const rl = readline.createInterface({
 });
 
 const options = {
-  option1: "../pdf_reader/opcao1.PDF",   // ENGIE
-  option2: "../pdf_reader/opcao2.pdf",   // MD GROUP
-  option3: "../pdf_reader/opcao3.Pdf",   // GLN
+  option1: "../test_pdfs/opcao1.PDF",   // ENGIE
+  option2: "../test_pdfs/opcao2.PDF",   // MD GROUP
+  option3: "../test_pdfs/opcao3.PDF",   // GLN
 };
 
 console.log("Escolha o PDF para processar:");
