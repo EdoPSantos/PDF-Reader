@@ -20,53 +20,85 @@ const options = {
 console.log("Escolha o PDF para processar:");
 console.log("1. ENGIE");
 console.log("2. MD GROUP");
-console.log("3. GLN\n");
+console.log("3. GLN");
+console.log("4. TODOS OS ACIMA\n");
 
-rl.question("Digite o número da opção: ", (answer) => {
-  const selectedKey = `option${answer}`;
-  const selectedFile = options[selectedKey];
+rl.question("Digite o número da opção: ", async (answer) => {
+  const STOP_WORDS = [
+    "Item", "Material", "Descrição", "Solicitação", "ENGIE",
+    "Processado por computador", "Emitido por", "Pág.", "Data de emissão",
+    "Condições Gerais", "Email", "N°", "A presente Solicitação de Proposta",
+    "PG.33.001.PRT", "disponíveis em", "Com a resposta a esta solicitação",
+    "O nosso número fiscal de identificação",
+    "as condições de entrega indicadas nesta Solicitação",
+    "não carece de assinatura", "Name:", "Emitido por:"
+  ];
 
-  if (!selectedFile || !fs.existsSync(selectedFile)) {
-    console.error("⚠️ Opção inválida ou ficheiro não encontrado.");
-    rl.close();
-    return;
-  }
+  async function processPDF(path, readerFn, label, stopWords = null) {
+    if (!fs.existsSync(path)) {
+      console.warn(`Ficheiro não encontrado: ${path}`);
+      return [];
+    }
 
-  const buffer = fs.readFileSync(selectedFile);
+    const buffer = fs.readFileSync(path);
+    const data = await pdfParse(buffer);
 
-  pdfParse(buffer).then(function (data) {
     const lines = data.text
       .split("\n")
       .map(l => l.trim())
       .filter(l => l !== "");
 
-    const STOP_WORDS = [
-      "Item", "Material", "Descrição", "Solicitação", "ENGIE",
-      "Processado por computador", "Emitido por", "Pág.", "Data de emissão",
-      "Condições Gerais", "Email", "N°", "A presente Solicitação de Proposta",
-      "PG.33.001.PRT", "disponíveis em", "Com a resposta a esta solicitação",
-      "O nosso número fiscal de identificação",
-      "as condições de entrega indicadas nesta Solicitação",
-      "não carece de assinatura", "Name:", "Emitido por:"
-    ];
+    const result = stopWords ? readerFn(lines, stopWords) : readerFn(lines);
 
-    const resultsEngie = engieReader(lines, STOP_WORDS);
-    const resultsQF = qfReader(lines);
-    const resultsRerom = reromReader(lines);
+    console.log(`\nResultados de ${label}:\n`);
+    console.table(result);
 
-    const allResults = [
-      ...resultsEngie,
-      ...resultsQF,
-      ...resultsRerom
-    ];
-
-    console.log("\nItens extraídos:\n");
-    console.table(allResults);
-
-     if (answer === "3") {
+    if (label === "GLN") {
       console.log("Ainda não está 100% funcional\n");
     }
-    
-    rl.close();
-  });
+
+    return result;
+  }
+
+  if (answer === "4") {
+    await processPDF(options.option1, engieReader, "ENGIE", STOP_WORDS);
+    await processPDF(options.option2, qfReader, "MD GROUP");
+    await processPDF(options.option3, reromReader, "GLN");
+  } else {
+    const selectedKey = `option${answer}`;
+    const selectedFile = options[selectedKey];
+
+    if (!selectedFile || !fs.existsSync(selectedFile)) {
+      console.error("Opção inválida ou ficheiro não encontrado.");
+      rl.close();
+      return;
+    }
+
+    const buffer = fs.readFileSync(selectedFile);
+    const data = await pdfParse(buffer);
+
+    const lines = data.text
+      .split("\n")
+      .map(l => l.trim())
+      .filter(l => l !== "");
+
+    let results = [];
+
+    if (answer === "1") {
+      results = engieReader(lines, STOP_WORDS);
+    } else if (answer === "2") {
+      results = qfReader(lines);
+    } else if (answer === "3") {
+      results = reromReader(lines);
+    }
+
+    console.log("\nItens extraídos:\n");
+    console.table(results);
+
+    if (answer === "3" || answer === "4") {
+      console.log("GLN ainda não está 100% funcional\n");
+    }
+  }
+
+  rl.close();
 });
