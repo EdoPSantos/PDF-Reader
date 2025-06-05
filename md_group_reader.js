@@ -1,6 +1,6 @@
 const fusedLineRegex = /^(\d{5})(\d{1,3}),\d{2}(un|kg|pcs)(\d{1,3}),\d{2}(\d{1,3}),\d{2}(\d{3})\s*-\s*(.+?)\s*-\s*(\d{2}\/\d{2}\/\d{4})$/i;
 
-function qfReader(lines) {
+function mdReader(lines) {
   const results = [];
 
   for (const line of lines) {
@@ -26,4 +26,4 @@ function qfReader(lines) {
   return results;
 }
 
-module.exports = qfReader;
+module.exports = mdReader;

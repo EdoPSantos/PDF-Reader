@@ -1,4 +1,36 @@
+# Node modules
 node_modules/
+
+# Ambiente e configuração local
 .env
+.env.local
+
+# MacOS
 .DS_Store
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test PDFs
+test_pdfs/*.pdf
+
+# Output de depuração ou cache temporário
+*.cache
+*.tmp
+.tmp/
+.cache/
+
+# Pasta de saída opcional (caso uses algum sistema que gere output)
+dist/
+build/
+out/
+
+# VSCode
+.vscode/
+
+# Sistema operacional
+Thumbs.db
+Desktop.ini

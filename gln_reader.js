@@ -1,4 +1,4 @@
-const reromBlockPattern = [
+const glnBlockPattern = [
   /^\d{1,3},\d{3}$/,
   /^[A-Z]{2}$/,
   /^\d{3,5}$/,
@@ -7,14 +7,14 @@ const reromBlockPattern = [
   /^.+$/,
 ];
 
-function reromReader(lines) {
+function gnlReader(lines) {
   const results = [];
 
   for (let i = 0; i < lines.length; i++) {
     const block = lines.slice(i, i + 6);
-    const isRerom = block.length === 6 && block.every((line, idx) => reromBlockPattern[idx].test(line));
+    const isGnl = block.length === 6 && block.every((line, idx) => glnBlockPattern[idx].test(line));
 
-    if (isRerom) {
+    if (isGnl) {
       const [quantityRaw, prefix, destination, designationRaw, specsRaw, partRefRaw] = block;
 
       const quantityMatch = quantityRaw.match(/^(\d{1,3}),(\d{3})$/);
@@ -40,7 +40,7 @@ function reromReader(lines) {
       const refMatch = partRefRaw.match(/^(.+?)\s*\(?(\d+)\)?$/);
       if (refMatch) {
         parts = refMatch[1].trim();
-        reference = `(${refMatch[2]})`;
+        reference = `(${refMatch[3]})`;
       }
 
       results.push({
@@ -60,4 +60,4 @@ function reromReader(lines) {
   return results;
 }
 
-module.exports = reromReader;
+module.exports = gnlReader;

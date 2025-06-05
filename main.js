@@ -3,8 +3,8 @@ const pdfParse = require("pdf-parse");
 const readline = require("readline");
 
 const engieReader = require("./engie_reader");
-const qfReader = require("./qf_reader");
-const reromReader = require("./rerom_reader");
+const mdReader = require("./md_group_reader");
+const reromReader = require("./gln_reader");
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -12,9 +12,9 @@ const rl = readline.createInterface({
 });
 
 const options = {
-  option1: "../test_pdfs/opcao1.PDF",   // ENGIE
-  option2: "../test_pdfs/opcao2.PDF",   // MD GROUP
-  option3: "../test_pdfs/opcao3.PDF",   // GLN
+  option1: "./test_pdfs/opcao1.pdf",   // ENGIE
+  option2: "./test_pdfs/opcao2.PDF",   // MD GROUP
+  option3: "./test_pdfs/opcao3.PDF",   // GLN
 };
 
 console.log("Escolha o PDF para processar:");
@@ -62,7 +62,7 @@ rl.question("Digite o número da opção: ", async (answer) => {
 
   if (answer === "4") {
     await processPDF(options.option1, engieReader, "ENGIE", STOP_WORDS);
-    await processPDF(options.option2, qfReader, "MD GROUP");
+    await processPDF(options.option2, mdReader, "MD GROUP");
     await processPDF(options.option3, reromReader, "GLN");
   } else {
     const selectedKey = `option${answer}`;
@@ -87,7 +87,7 @@ rl.question("Digite o número da opção: ", async (answer) => {
     if (answer === "1") {
       results = engieReader(lines, STOP_WORDS);
     } else if (answer === "2") {
-      results = qfReader(lines);
+      results = mdReader(lines);
     } else if (answer === "3") {
       results = reromReader(lines);
     }

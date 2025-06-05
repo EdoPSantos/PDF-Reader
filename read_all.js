@@ -95,7 +95,7 @@ pdfParse(buffer).then(function (data) {
       continue;
     }
 
-    // 2. Layout QF colado
+    // 2. MD Group
     const fusedMatch = line.match(fusedLineRegex);
     if (fusedMatch) {
     const [
@@ -117,7 +117,7 @@ pdfParse(buffer).then(function (data) {
     continue;
     }
 
-    // 3. Layout REROM (bloco de 6 linhas seguidas)
+    // 3. GNL
     const block = lines.slice(i, i + 6);
     const isRerom = block.length === 6 && block.every((line, idx) => reromBlockPattern[idx].test(line));
 
