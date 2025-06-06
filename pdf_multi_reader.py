@@ -17,6 +17,9 @@ REFERENCE_KEYWORDS = [
     "r", "r.", "r:", 
 ]
 
+QUANTITY_KEYWORDS = [
+    "quantidade", "qtd", "qt", "qt.", "unidades", "qte", "qte."
+]
 
 
 def normalize(text):
@@ -108,7 +111,7 @@ def parse_item_block(block):
 
 
 folder = "test_pdfs"
-"""pdf_files = [f for f in os.listdir(folder) if f.lower().endswith(".pdf")]
+pdf_files = [f for f in os.listdir(folder) if f.lower().endswith(".pdf")]
 
 if not pdf_files:
     print("Nenhum PDF encontrado.")
@@ -138,6 +141,4 @@ for pdf_file in pdf_files:
         print(" Quantidade:", parsed["quantidade"])
         print(" Informação:", parsed["informacao"])
 
-print("\nFim do processamento.") """
-
-
+print("\nFim do processamento.")

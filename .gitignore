@@ -34,3 +34,6 @@ out/
 # Sistema operacional
 Thumbs.db
 Desktop.ini
+
+# Ignorar o ficheiro usable
+usable
