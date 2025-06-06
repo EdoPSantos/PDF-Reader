@@ -14,8 +14,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Test PDFs
+# Tests
 test_pdfs/*.pdf
+
+excels
+
+notepads
+
+jsons
+
 
 # Output de depuração ou cache temporário
 *.cache
