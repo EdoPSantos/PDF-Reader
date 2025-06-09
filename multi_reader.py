@@ -103,15 +103,19 @@ if not excel_files:
 
 for excel_file in excel_files:
     path = os.path.join(excel_folder, excel_file)
-    df = pd.read_excel(path, header=None)
+    # Lê todas as folhas
+    sheets = pd.read_excel(path, header=None, sheet_name=None)
+    all_items = []
     print(f"\n======= {excel_file} =======")
-    items = extract_items_quantity_only(df)
+    for sheet_name, df in sheets.items():
+        items = extract_items_quantity_only(df)
+        all_items.extend(items)
 
-    if not items:
+    if not all_items:
         print("Nenhum item válido encontrado.")
         continue
 
-    for idx, item in enumerate(items, 1):
+    for idx, item in enumerate(all_items, 1):
         print(f"\nItem {idx}:")
         print(" Referência:", item["referencia"])
         print(" Quantidade:", item["quantidade"])
