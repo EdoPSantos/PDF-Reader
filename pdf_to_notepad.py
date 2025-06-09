@@ -36,7 +36,7 @@ def extract_with_grid(page, colunas_x):
 
 def pdf_to_txt(pdf_path, txt_path):
     all_lines = []
-    print(f"🔍 A processar: {pdf_path}")
+    print(f"A processar: {pdf_path}")
 
     with pdfplumber.open(pdf_path) as pdf:
         for page_num, page in enumerate(pdf.pages, start=1):
@@ -50,9 +50,9 @@ def pdf_to_txt(pdf_path, txt_path):
     if all_lines:
         with open(txt_path, "w", encoding="utf-8") as f:
             f.write("\n".join(all_lines))
-        print(f"✅ Criado: {txt_path}")
+        print(f"Criado: {txt_path}")
     else:
-        print(f"⚠️ Nenhum conteúdo relevante encontrado: {pdf_path}")
+        print(f"Nenhum conteúdo relevante encontrado: {pdf_path}")
 
 # === Loop pelos PDFs ===
 for filename in os.listdir(input_folder):
@@ -62,7 +62,7 @@ for filename in os.listdir(input_folder):
         txt_path = os.path.join(output_folder, txt_name)
 
         if os.path.exists(txt_path):
-            print(f"⏭️ Ignorado (já existe): {txt_name}")
+            print(f"Ignorado (já existe): {txt_name}")
             continue
 
         pdf_to_txt(pdf_path, txt_path)

@@ -1,144 +1,121 @@
 import os
-import pdfplumber
+import pandas as pd
 import re
-import logging
+import string
 
-logging.getLogger("pdfminer").setLevel(logging.ERROR)
-
+# Palavras-chave e filtros
 IGNORED_PHRASES = [
     "emitido por", "processado por computador", "condições gerais",
     "assinatura", "observações", "email", "np", "fatura", "versão", "documento"
 ]
-
-REFERENCE_KEYWORDS = [
-    "ref", "ref.", "ref:", 
-    "referência", "referência.", "referência:", 
-    "referencia", "referencia.", "referencia:", 
-    "r", "r.", "r:", 
-]
-
-QUANTITY_KEYWORDS = [
-    "quantidade", "qtd", "qt", "qt.", "unidades", "qte", "qte."
-]
-
+REFERENCE_KEYWORDS = ["ref", "referência", "referencia", "r"]
+QUANTITY_KEYWORDS = ["quantity", "quantidade", "qtd", "qt", "q"]
 
 def normalize(text):
-    return text.strip().lower()
+    return str(text).strip().lower()
 
+def clean_label(text):
+    return normalize(text).strip(string.punctuation)
 
-def is_garbage(line):
-    norm = normalize(line)
+def is_garbage(text):
+    norm = normalize(text)
     return any(p in norm for p in IGNORED_PHRASES) or len(norm) < 3
 
-
-def extract_lines_by_position(page, y_tolerance=3):
-    words = page.extract_words()
-    if not words:
-        return []
-    lines_dict = {}
-    for word in words:
-        top = round(word["top"] / y_tolerance) * y_tolerance
-        lines_dict.setdefault(top, []).append(word)
-    lines = []
-    for top in sorted(lines_dict):
-        line_words = sorted(lines_dict[top], key=lambda w: w["top"])
-        line_text = " ".join(w["text"] for w in line_words)
-        lines.append(line_text)
-    return lines
-
+def extract_quantity(text):
+    match = re.search(r"\b(\d+[.,]?\d*)\s*(un|um|pcs|kg|mm)?\b", str(text).lower())
+    return f"{match.group(1)} {match.group(2).upper() if match.group(2) else ''}".strip() if match else ""
 
 def extract_reference(text):
-    lines = text.split("\n") if "\n" in text else [text]
-    for line in lines:
-        norm = normalize(line)
-        if any(k in norm for k in REFERENCE_KEYWORDS):
-            ref_match = re.search(r"(?:ref(?:er[êé]ncia)?[:\-]?)\s*([A-Z0-9.\-/]+)", line, re.IGNORECASE)
-            if ref_match:
-                return ref_match.group(1)
-    match = re.search(r"\b([A-Z]{2,}[\.-]?[A-Z0-9]+)\b", text)
+    norm = normalize(text)
+    if norm in REFERENCE_KEYWORDS:
+        return ""
+    if any(k in norm for k in REFERENCE_KEYWORDS):
+        match = re.search(r"(?:ref(?:er[êé]ncia)?[:\-]?)\s*([A-Z0-9.\-/]+)", norm, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    match = re.search(r"\b([A-Z]{2,}[.\-]?[A-Z0-9]+)\b", str(text))
     return match.group(1) if match else ""
 
-
-def extract_quantity(text):
-    match = re.search(r"\b(\d+[,.]?\d*)\s*(un|um|pcs|kg|mm)\b", text.lower())
-    return f"{match.group(1)} {match.group(2).upper()}" if match else ""
-
-
-def extract_items(lines):
+def extract_items_from_excel(df):
     items = []
-    buffer = []
+    n_rows, n_cols = df.shape
 
-    for line in lines:
-        norm = normalize(line)
-        if is_garbage(norm):
-            continue
+    for row in range(n_rows):
+        for col in range(n_cols):
+            cell = str(df.iat[row, col])
+            if is_garbage(cell):
+                continue
 
-        if re.search(r"\b\d{4,}\b", norm) or re.search(r"\b\d+[,.]?\d*\s*(un|kg|pcs|mm)\b", norm):
-            if buffer:
-                current_text = " ".join(buffer)
-                current_ref = extract_reference(current_text)
-                current_qty = extract_quantity(current_text)
-                if not current_ref or not current_qty:
-                    next_ref = extract_reference(line)
-                    next_qty = extract_quantity(line)
-                    if not current_ref and next_ref:
-                        buffer.append(line)
-                        items.append(buffer.copy())
-                        buffer.clear()
-                        continue
-                    elif not current_qty and next_qty:
-                        buffer.append(line)
-                        items.append(buffer.copy())
-                        buffer.clear()
-                        continue
-                items.append(buffer.copy())
-                buffer.clear()
-            buffer.append(line)
-        else:
-            buffer.append(line)
+            # Procurar se esta célula é uma quantidade válida
+            qty_text = extract_quantity(cell)
+            if qty_text and re.search(r"\d", qty_text):
+                qty_row = row
+                ref_text = ""
+                ref_row = None
 
-    if buffer:
-        items.append(buffer.copy())
+                # Procurar referência nas linhas acima (até 5 linhas antes), colunas ±1
+                for dy in range(1, 6):
+                    r = row - dy
+                    if r < 0:
+                        break
+                    for dx in [-1, 0, 1]:
+                        c = col + dx
+                        if c < 0 or c >= n_cols:
+                            continue
+                        candidate_ref = extract_reference(df.iat[r, c])
+                        if candidate_ref:
+                            ref_text = candidate_ref
+                            ref_row = r
+                            break
+                    if ref_row is not None:
+                        break
+
+                # Definir limites para juntar info
+                y1 = ref_row if ref_row is not None else row
+                y2 = qty_row
+                min_y = min(y1, y2)
+                max_y = max(y1, y2)
+
+                # Junta todas as palavras das linhas entre referência e quantidade (inclusive)
+                info_words = []
+                for i in range(min_y, max_y + 1):
+                    for word in df.iloc[i]:
+                        if pd.isna(word):
+                            continue
+                        if not is_garbage(word):
+                            info_words.append(str(word))
+
+                items.append({
+                    "referencia": ref_text,
+                    "quantidade": qty_text,
+                    "informacao": " ".join(info_words)
+                })
+
     return items
 
+# Caminho dos ficheiros Excel
+excel_folder = "excels_visual"
+# Ignorar ficheiros temporários do Excel (~$)
+excel_files = [f for f in os.listdir(excel_folder) if f.endswith(".xlsx") and not f.startswith("~$")]
 
-def parse_item_block(block):
-    full_text = " ".join(block)
-    ref = extract_reference(full_text)
-    qty = extract_quantity(full_text)
-    info = full_text
-    return {"referencia": ref, "quantidade": qty, "informacao": info}
-
-
-folder = "test_pdfs"
-pdf_files = [f for f in os.listdir(folder) if f.lower().endswith(".pdf")]
-
-if not pdf_files:
-    print("Nenhum PDF encontrado.")
+if not excel_files:
+    print("Nenhum ficheiro Excel encontrado.")
     exit()
 
-for pdf_file in pdf_files:
-    path = os.path.join(folder, pdf_file)
-    print(f"\n==============================\nPDF: {pdf_file}\n==============================")
+for excel_file in excel_files:
+    path = os.path.join(excel_folder, excel_file)
+    df = pd.read_excel(path, header=None)
+    items = extract_items_from_excel(df)
 
-    all_lines = []
-
-    with pdfplumber.open(path) as pdf:
-        for page in pdf.pages:
-            page_lines = extract_lines_by_position(page)
-            all_lines.extend(page_lines)
-
-    item_blocks = extract_items(all_lines)
-
-    if not item_blocks or all(len(block) == 0 for block in item_blocks):
-        print("Nenhum item detectado.")
+    print(f"\n======= {excel_file} =======")
+    if not items:
+        print("Nenhum item válido encontrado.")
         continue
 
-    for i, block in enumerate(item_blocks, 1):
-        parsed = parse_item_block(block)
-        print(f"\nItem {i}:")
-        print(" Referência:", parsed["referencia"])
-        print(" Quantidade:", parsed["quantidade"])
-        print(" Informação:", parsed["informacao"])
+    for idx, item in enumerate(items, 1):
+        print(f"\nItem {idx}:")
+        print(" Referência:", item["referencia"])
+        print(" Quantidade:", item["quantidade"])
+        print(" Informação:", item["informacao"])
 
 print("\nFim do processamento.")

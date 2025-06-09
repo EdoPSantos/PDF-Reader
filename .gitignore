@@ -18,11 +18,9 @@ yarn-error.log*
 test_pdfs/*.pdf
 
 excels
-
 notepads
-
 jsons
-
+excels_visual
 
 # Output de depuração ou cache temporário
 *.cache
@@ -44,3 +42,18 @@ Desktop.ini
 
 # Ignorar o ficheiro usable
 usable
+
+# Python - ficheiros de cache e compilados
+__pycache__/
+*.py[cod]
+
+# Lockfile do npm (opcional ignorar)
+package-lock.json
+
+# Arquivos Excel gerados diretamente
+*.xlsx
+*.xls
+
+# Arquivos temporários de edição
+*~
+*.swp

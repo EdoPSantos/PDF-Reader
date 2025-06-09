@@ -43,7 +43,7 @@ def process_pdf(pdf_path, output_path):
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(pages, f, indent=2, ensure_ascii=False)
-    print(f"✅ Exportado: {output_path}")
+    print(f"Exportado: {output_path}")
 
 # Processa todos os PDFs na pasta
 for filename in os.listdir(input_folder):

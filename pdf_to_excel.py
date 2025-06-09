@@ -38,7 +38,7 @@ def extrair_com_grelha(page, colunas_x):
 
 def pdf_para_excel(pdf_path, excel_path):
     all_tables = []
-    print(f"🔍 A processar: {pdf_path}")
+    print(f"A processar: {pdf_path}")
 
     with pdfplumber.open(pdf_path) as pdf:
         for page_num, page in enumerate(pdf.pages, start=1):
@@ -52,9 +52,9 @@ def pdf_para_excel(pdf_path, excel_path):
         with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
             for idx, table in enumerate(all_tables):
                 table.to_excel(writer, sheet_name=f"Pag_{idx+1}", index=False, header=False)
-        print(f"✅ Criado: {excel_path}")
+        print(f"Criado: {excel_path}")
     else:
-        print(f"⚠️ Nenhum conteúdo relevante encontrado: {pdf_path}")
+        print(f"Nenhum conteúdo relevante encontrado: {pdf_path}")
 
 # === Loop por todos os PDFs ===
 for filename in os.listdir(input_folder):
@@ -64,7 +64,7 @@ for filename in os.listdir(input_folder):
         excel_path = os.path.join(output_folder, excel_name)
 
         if os.path.exists(excel_path):
-            print(f"⏭️ Ignorado (já existe): {excel_name}")
+            print(f"Ignorado (já existe): {excel_name}")
             continue
 
         pdf_para_excel(pdf_path, excel_path)
