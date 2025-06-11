@@ -65,7 +65,7 @@ def extract_items_quantity_only(df, SEARCH_DEPTH=10):
                 r2 = row + dr
                 if r2 >= n_rows:
                     break
-                for dc in [-1, 0, 1]:
+                for dc in [-2, -1, 0, 1, 2]:
                     c2 = qty_col + dc
                     if c2 < 0 or c2 >= n_cols:
                         continue

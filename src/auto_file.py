@@ -20,19 +20,32 @@ def json_to_excel(json_path, excel_path):
 def process_excel(excel_path):
     subprocess.run([python_executable, "multi_reader.py", excel_path], cwd=os.path.dirname(__file__))
 
+# Dicionário para evitar processamentos repetidos em pouco tempo
+recently_processed = {}
+
 class PDFHandler(FileSystemEventHandler):
     def on_created(self, event):
-        if event.is_directory:
+        if event.is_directory or not event.src_path.lower().endswith(".pdf"):
             return
-        if event.src_path.lower().endswith(".pdf"):
-            print(f"Novo PDF detectado: {event.src_path}")
-            base = os.path.splitext(os.path.basename(event.src_path))[0]
-            json_path = os.path.join(JSON_OUTPUT_FOLDER, f"{base}.json")
-            excel_path = os.path.join(EXCEL_OUTPUT_FOLDER, f"{base}.xlsx")
-            # Chama cada passo do pipeline
-            pdf_to_json(event.src_path, json_path)
-            json_to_excel(json_path, excel_path)
-            process_excel(excel_path)
+
+        base = os.path.splitext(os.path.basename(event.src_path))[0]
+        now = time.time()
+        last = recently_processed.get(base, 0)
+        if now - last < 10:
+            # Ignora se já foi processado há menos de 10 segundos
+            return
+        recently_processed[base] = now
+
+        print(f"Novo PDF detectado: {event.src_path}")
+
+        # Espera um pouco para garantir que o ficheiro foi completamente copiado
+        time.sleep(1)
+
+        json_path = os.path.join(JSON_OUTPUT_FOLDER, f"{base}.json")
+        excel_path = os.path.join(EXCEL_OUTPUT_FOLDER, f"{base}.xlsx")
+        pdf_to_json(event.src_path, json_path)
+        json_to_excel(json_path, excel_path)
+        process_excel(excel_path)
 
 if __name__ == "__main__":
     # Caminho absoluto da pasta a monitorizar
