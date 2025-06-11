@@ -3,7 +3,7 @@ import os
 import json
 
 # Pasta de origem dos PDFs e destino dos JSONs
-input_folder = "test_pdfs"
+input_folder = "pdfs"
 output_folder = "jsons"
 os.makedirs(output_folder, exist_ok=True)
 

@@ -1,7 +1,7 @@
 import pdfplumber
 import os
 
-folder = "test_pdfs"
+folder = "pdfs"
 
 # Lista os PDFs disponíveis
 pdf_files = [f for f in os.listdir(folder) if f.lower().endswith(".pdf")]

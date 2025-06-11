@@ -2,8 +2,8 @@ import os
 import pdfplumber
 import pandas as pd
 
-input_folder = "test_pdfs"
-output_folder = "excels"
+input_folder = "pdfs"
+output_folder = "excels_from_pdf"
 os.makedirs(output_folder, exist_ok=True)
 
 # Define as divisões horizontais da "grelha invisível" (em pontos PDF)

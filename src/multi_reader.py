@@ -61,6 +61,7 @@ def extract_items_quantity_only(df, SEARCH_DEPTH=10):
 
     items = []
     already_found = set()  # para evitar duplicados
+    item_positions = []
 
     # Para cada coluna de quantidade detetada
     for qty_col in qty_cols:
@@ -84,9 +85,12 @@ def extract_items_quantity_only(df, SEARCH_DEPTH=10):
                         already_found.add(key)
                         # Informação: toda a linha (r2) sem células vazias
                         info = " ".join(str(df.iat[r2, cc]) for cc in range(n_cols) if not is_garbage(df.iat[r2, cc]))
+                        try:
+                            quantidade_int = int(float(val.replace(",", ".")))
+                        except Exception:
+                            quantidade_int = val  # mantém original se não for possível converter
                         items.append({
-                            "referencia": "",  # universal, fica vazio
-                            "quantidade": val,
+                            "quantidade": quantidade_int,
                             "informacao": info
                         })
                         break  # parar de procurar depois de encontrar o primeiro valor nesta zona
@@ -117,8 +121,7 @@ for excel_file in excel_files:
 
     for idx, item in enumerate(all_items, 1):
         print(f"\nItem {idx}:")
-        print(" Referência:", item["referencia"])
         print(" Quantidade:", item["quantidade"])
-        print(" Informação:", item["informacao"])
+        print("\n Informação:", item["informacao"])
 
 print("\nFim do processamento.")

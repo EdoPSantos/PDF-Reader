@@ -1,59 +1,49 @@
-# Node modules
+# Node.js
 node_modules/
 
-# Ambiente e configuração local
+# Ambientes virtuais
+plumber_env/
 .env
 .env.local
 
-# MacOS
+# IDEs e sistema operativo
+.vscode/
 .DS_Store
+Thumbs.db
+Desktop.ini
 
-# Logs
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Logs, temporários e caches
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Tests
-test_pdfs/*.pdf
-
-excels
-notepads
-jsons
-excels_visual
-
-# Output de depuração ou cache temporário
-*.cache
 *.tmp
-.tmp/
-.cache/
+*.cache
+*.swp
+*~
 
-# Pasta de saída opcional (caso uses algum sistema que gere output)
+# Build/output (para web ou outros)
 dist/
 build/
 out/
 
-# VSCode
-.vscode/
+# Dados gerados: ignora tudo dentro das pastas, exceto o .gitkeep
+excels_from_pdf/*
+!excels_from_pdf/.gitkeep
 
-# Sistema operacional
-Thumbs.db
-Desktop.ini
+excels_visual/*
+!excels_visual/.gitkeep
 
-# Ignorar o ficheiro usable
-usable
+jsons/*
+!jsons/.gitkeep
 
-# Python - ficheiros de cache e compilados
-__pycache__/
-*.py[cod]
+pdfs/*
+!pdfs/.gitkeep
 
-# Lockfile do npm (opcional ignorar)
-package-lock.json
+notepads/*
+!notepads/.gitkeep
 
-# Arquivos Excel gerados diretamente
+# Arquivos Excel
 *.xlsx
 *.xls
-
-# Arquivos temporários de edição
-*~
-*.swp
