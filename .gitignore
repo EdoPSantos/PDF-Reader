@@ -2,7 +2,7 @@
 node_modules/
 
 # Ambientes virtuais
-plumber_env/
+pdf_venv/
 .env
 .env.local
 
