@@ -1,30 +1,26 @@
+import sys
 import os
 import json
 import pandas as pd
 
-# Caminho da pasta com os ficheiros JSON (altera conforme necessário)
-json_folder = "jsons"
-output_folder = "excels_visual"
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Uso: python json_to_excel.py <json_path> <excel_path>")
+        sys.exit(1)
 
-# Cria pasta de saída se não existir
-os.makedirs(output_folder, exist_ok=True)
+    json_path = sys.argv[1]
+    output_excel = sys.argv[2]
 
-# Parâmetros da grelha
-row_height = 15
-col_width = 5
-x_scale = 4  # ajusta a escala horizontal
-y_scale = 1  # ajusta a escala vertical
+    # Parâmetros da grelha
+    row_height = 15
+    col_width = 5
+    x_scale = 4  # ajusta a escala horizontal
+    y_scale = 1  # ajusta a escala vertical
 
-# Listar ficheiros JSON
-json_files = [f for f in os.listdir(json_folder) if f.lower().endswith(".json")]
-
-for json_file in json_files:
-    path = os.path.join(json_folder, json_file)
-    with open(path, "r", encoding="utf-8") as f:
+    # Lê o ficheiro JSON recebido
+    with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Criar Excel para este ficheiro
-    output_excel = os.path.join(output_folder, f"{os.path.splitext(json_file)[0]}.xlsx")
     writer = pd.ExcelWriter(output_excel, engine='xlsxwriter')
 
     for page in data:

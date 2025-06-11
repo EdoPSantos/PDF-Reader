@@ -52,18 +52,13 @@ def find_headers(df, keywords):
 
 def extract_items_quantity_only(df, SEARCH_DEPTH=10):
     n_rows, n_cols = df.shape
-
-    # Encontrar onde está o cabeçalho de quantidade
     header_row_qty, qty_cols = find_headers(df, QUANTITY_KEYWORDS)
     if header_row_qty is None or not qty_cols:
         print("Não foi possível encontrar cabeçalho de quantidade.")
         return []
-
     items = []
     already_found = set()  # para evitar duplicados
-    item_positions = []
 
-    # Para cada coluna de quantidade detetada
     for qty_col in qty_cols:
         for row in range(header_row_qty + 1, n_rows):
             for dr in range(SEARCH_DEPTH):
@@ -76,29 +71,27 @@ def extract_items_quantity_only(df, SEARCH_DEPTH=10):
                         continue
                     cell = df.iat[r2, c2]
                     val = str(cell).strip()
-                    # Só guarda se não for cabeçalho e for número
                     if not is_garbage(val) and not is_header_word(val) and is_quantity_number(val):
-                        # Evitar duplicados: não guardar mesma quantidade + info iguais
                         key = (val, r2)
                         if key in already_found:
                             continue
                         already_found.add(key)
-                        # Informação: toda a linha (r2) sem células vazias
                         info = " ".join(str(df.iat[r2, cc]) for cc in range(n_cols) if not is_garbage(df.iat[r2, cc]))
                         try:
                             quantidade_int = int(float(val.replace(",", ".")))
                         except Exception:
                             quantidade_int = val  # mantém original se não for possível converter
                         items.append({
-                            "quantidade": quantidade_int,
-                            "informacao": info
+                            "Quantidade": quantidade_int,
+                            "Informacao": info
                         })
-                        break  # parar de procurar depois de encontrar o primeiro valor nesta zona
-
+                        break
     return items
 
 # Caminho dos ficheiros Excel
-excel_folder = "excels_visual"
+excel_folder = "../excels_visual"
+output_folder = "../result"
+os.makedirs(output_folder, exist_ok=True)
 excel_files = [f for f in os.listdir(excel_folder) if f.endswith(".xlsx") and not f.startswith("~$")]
 
 if not excel_files:
@@ -107,21 +100,30 @@ if not excel_files:
 
 for excel_file in excel_files:
     path = os.path.join(excel_folder, excel_file)
-    # Lê todas as folhas
     sheets = pd.read_excel(path, header=None, sheet_name=None)
     all_items = []
-    print(f"\n======= {excel_file} =======")
     for sheet_name, df in sheets.items():
         items = extract_items_quantity_only(df)
         all_items.extend(items)
 
     if not all_items:
-        print("Nenhum item válido encontrado.")
+        print(f"[{excel_file}] Nenhum item válido encontrado.")
+        output_path = os.path.join(output_folder, os.path.splitext(excel_file)[0] + ".txt")
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write("Nenhum valor adquirido.")
+        print(f"[{excel_file}] Ficheiro criado em: {output_path}")
         continue
 
-    for idx, item in enumerate(all_items, 1):
-        print(f"\nItem {idx}:")
-        print(" Quantidade:", item["quantidade"])
-        print("\n Informação:", item["informacao"])
+    # Adiciona coluna "Item" (número sequencial, começa em 1)
+    for i, item in enumerate(all_items, 1):
+        item["Item"] = i
+
+    # Garante a ordem das colunas: Item, Quantidade, Informacao
+    df_out = pd.DataFrame(all_items)
+    df_out = df_out[["Item", "Quantidade", "Informacao"]]
+
+    output_path = os.path.join(output_folder, excel_file)
+    df_out.to_excel(output_path, index=False)
+    print(f"[{excel_file}] Ficheiro criado em: {output_path}")
 
 print("\nFim do processamento.")

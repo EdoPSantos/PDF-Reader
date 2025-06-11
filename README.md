@@ -30,7 +30,7 @@ pdf_reader/
 - **`tests/`**  
   Inclui **os vários scripts e ficheiros usados durante o desenvolvimento** para testar funcionalidades, experimentar abordagens e compreender o funcionamento da leitura e organização dos PDFs. São rascunhos, protótipos e exemplos intermédios que serviram de apoio à construção da solução principal mas ainda funcionais.
 
-- **`excels_from_pdf/`, `excels_visual/`, `jsons/`, `pdfs/`, `notepads/`**  
+- **`result/`, `excels_from_pdf/`, `excels_visual/`, `jsons/`, `pdfs/`, `notepads/`**  
   Estas pastas são criadas automaticamente pelo programa à medida que vais correndo os scripts e gerando resultados (Excel, JSON, Notepad, etc.).
   Por isso, podem não aparecer logo após clonares o repositório — surgem quando necessário, durante a utilização normal.
   A única pasta que precisas de criar manualmente é a pdfs/, onde deves colocar os PDFs de entrada que queres processar.

@@ -30,19 +30,16 @@ out/
 
 # Dados gerados: ignora tudo dentro das pastas, exceto o .gitkeep
 excels_from_pdf/*
-!excels_from_pdf/.gitkeep
 
 excels_visual/*
-!excels_visual/.gitkeep
 
-jsons/*
-!jsons/.gitkeep
+jsons/
 
 pdfs/*
-!pdfs/.gitkeep
 
 notepads/*
-!notepads/.gitkeep
+
+excel_result/*
 
 # Arquivos Excel
 *.xlsx
