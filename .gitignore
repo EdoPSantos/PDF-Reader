@@ -37,6 +37,8 @@ jsons/
 
 pdfs/*
 
+pdfs_out/*
+
 notepads/*
 
 excel_result/*

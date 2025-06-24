@@ -61,6 +61,14 @@ pdf_reader/
 
     - npm install
 
+**Para auto-file.py**
+
+    - pip install pandas
+    - pip install pymupdf
+    - pip install XlsxWriter
+    - pip install openpyxl
+
+
 **Para Python, recomenda-se o uso de um ambiente virtual:**
 
     - python -m venv plumber_env
