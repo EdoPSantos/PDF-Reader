@@ -21,6 +21,7 @@ __pycache__/
 *.tmp
 *.cache
 *.swp
+*.txt
 *~
 
 # Build/output (para web ou outros)

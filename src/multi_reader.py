@@ -89,6 +89,8 @@ def sort_items_by_key(items, *keys, default=0):
         key=lambda item: tuple(item.get(k, default) for k in keys)
     )
 
+def join_line_texts(words):
+    return " ".join(word["text"].strip() for word in words if word["text"].strip())
     
 #------------------------------------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------Excel------------------------------------------------------------------
@@ -246,7 +248,7 @@ def extract_items_pdf(path):
 #------------------------------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------JSON----------------------------------------------------------------
 
-def extract_items_json(pages, x_margin=20, max_lines=2, y_margin_correct_values=5):
+def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
     header_x = None
     header_y = None
     normalized_keywords = [normalize_info(k) for k in QUANTITY_KEYWORDS]
@@ -303,24 +305,29 @@ def extract_items_json(pages, x_margin=20, max_lines=2, y_margin_correct_values=
             # Descobre até onde pode apanhar (sem incluir próxima quantidade)
             if idx + 1 < len(qty_lines):
                 next_qty_y = qty_lines[idx + 1]
-                valid_ys = [yy for yy in y_sorted if y <= yy < next_qty_y][:max_lines]
+                valid_correct_ys = [yy for yy in y_sorted if yy < next_qty_y and abs(yy - y) <= y_margin_possible_values]
+                block_ys = [yy for yy in y_sorted if y <= yy < next_qty_y]
             else:
-                valid_ys = [yy for yy in y_sorted if y <= yy][:max_lines]
-
-            # Linhas do item (quantidade + as N linhas abaixo)
-            item_lines = []
-            for yy in valid_ys:
-                item_lines.extend(lines[yy])
-            item_lines = sort_items_by_key(item_lines, "x")
-            possible_values = " ".join(word["text"].strip() for word in item_lines if word["text"].strip())
-
-            # "Valores corretos": todas as palavras das linhas próximas (margem y ±5, centrado na quantidade)
-            correct_value_lines = []
-            for yy in y_sorted:
-                if abs(yy - y) <= y_margin_correct_values:
-                    correct_value_lines.extend(lines[yy])
-            correct_value_lines = sort_items_by_key(correct_value_lines, "x")
-            correct_values = " ".join(word["text"].strip() for word in correct_value_lines if word["text"].strip())
+                valid_correct_ys = [yy for yy in y_sorted if abs(yy - y) <= y_margin_possible_values]
+                block_ys = [yy for yy in y_sorted if y <= yy]
+            
+            # Adiciona margem em y para capturar mais informação em line_values
+            y_margin_line_values = 5  # ajuste conforme necessário
+            line_ys = [yy for yy in y_sorted if abs(yy - y) <= y_margin_line_values]
+            line_words = []
+            for yy in line_ys:
+                line_words.extend(lines[yy])
+            line_words_sorted = sort_items_by_key(line_words, "x")
+            line_values = join_line_texts(line_words_sorted)
+            
+            # ------------------------------------------- ALTERAR -------------------------------------------
+            # Atualmente procura linhas expecificas, mas o valor deve ser procurado atravez da subtração dos valores do "line_values"
+            possible_value_words = []
+            for yy in valid_correct_ys:
+                possible_value_words.extend(lines[yy])
+            possible_value_words_sorted = sort_items_by_key(possible_value_words, "x")
+            possible_values = join_line_texts(possible_value_words_sorted)
+            # -----------------------------------------------------------------------------------------------
 
             # Quantidade
             qty_word = next(
@@ -332,22 +339,22 @@ def extract_items_json(pages, x_margin=20, max_lines=2, y_margin_correct_values=
             )
             target_quantity = normalize_quantity(qty_word["text"]) if qty_word else ""
 
-            if idx + 1 < len(qty_lines):
-                next_qty_y = qty_lines[idx + 1]
-                block_ys = [yy for yy in y_sorted if y <= yy < next_qty_y]
-            else:
-                block_ys = [yy for yy in y_sorted if y <= yy]
-
             block_lines = []
             for yy in block_ys:
                 block_lines.extend(lines[yy])
             block_lines = sort_items_by_key(block_lines, "x")
-            full_content = " ".join(word["text"].strip() for word in block_lines if word["text"].strip())
+            full_content = join_line_texts(block_lines)
 
+            # Adiciona todas as quantidades identificadas na página
+            quantidades_encontradas = []
+            for yy in y_sorted:
+                for word in lines[yy]:
+                    if is_quantity_number(word["text"]):
+                        quantidades_encontradas.append(normalize_quantity(word["text"]))
             # Guarda o item
             json_items.append({
                 "Quantidade": target_quantity,
-                "Valores corretos": correct_values,
+                "Valores da linha": line_values,
                 "Possiveis valores": possible_values,
                 "Conteúdo total": full_content,
                 "page": page,
@@ -357,9 +364,12 @@ def extract_items_json(pages, x_margin=20, max_lines=2, y_margin_correct_values=
     return json_items, pages
 
 #----------------------------------------------------------------------------------------------------------------------------------
-#--------------------------------------------------------------Main----------------------------------------------------------------
+#-------------------------------------------------------------Main-----------------------------------------------------------------
 def main():
-    # 1. Excel
+    
+    #-------------------------------------------------------------------
+    # ---------------------------- 1. Excel ----------------------------
+
     excel_path = "../excels_visual/opcao3.xlsx"
     all_excel_items = []
     excel_quantidades = set()
@@ -368,15 +378,15 @@ def main():
         for sheet_name, df in sheets.items():
             excel_items = extract_items_quantity_only(df)
             excel_items = filter_duplicates_by_info(excel_items)
-            for item in excel_items:
-                excel_quantidades.add(normalize_quantity(item["Quantidade"]))
             all_excel_items.extend(excel_items)
             file_name_excel = get_file_title_from_path(excel_path)
     else:
         print("Excel não encontrado.")
         return
 
-    # 2. PDF
+    #-----------------------------------------------------------------
+    # ---------------------------- 2. PDF ----------------------------
+
     pdf_path = "../pdfs_out/opcao3.pdf"
     pdf_items = []
     if os.path.exists(pdf_path):
@@ -386,17 +396,111 @@ def main():
     else:
         print("PDF não encontrado.")
 
-    # 3. JSON
-    json_path = "../jsons/PC25000420.json"
-    json_items = []
-    if os.path.exists(json_path):
-        with open(json_path, encoding="utf-8") as f:
-            pages = json.load(f)
-        json_items, _ = extract_items_json(pages, x_margin=20)
-        json_items = filter_duplicates_by_info(json_items)
-        file_name_json = get_file_title_from_path(json_path)
+    #------------------------------------------------------------------
+    # ---------------------------- 3. JSON ----------------------------
+
+    jsons_folder = "../jsons"
+    if not os.path.exists(jsons_folder):
+        print("Pasta JSONs não encontrada.")
+        return
+    json_files = [f for f in os.listdir(jsons_folder) if f.endswith('.json')]
+    if not json_files:
+        print("Nenhum ficheiro JSON encontrado na pasta.")
+        return
+
+    #-------------------------------------------------------------------
+    # ------------------------ Imprime a Versão ------------------------
+    # Calcule o contador antes do loop
+    counter_path = os.path.join("..", "result", "contador.txt")
+    if os.path.exists(counter_path):
+        with open(counter_path, "r", encoding="utf-8") as f:
+            try:
+                counter = int(f.read().strip())
+            except Exception:
+                counter = 0
     else:
-        print("JSON não encontrado.")
+        counter = 0
+    counter += 1
+
+    erro_ocorrido = False
+
+    #--------------------------------------------------------------------
+    # ---------------------- Ciclo de Processamento ---------------------
+    for json_file in json_files:
+        try:
+            json_path = os.path.join(jsons_folder, json_file)
+            json_items = []
+            if os.path.exists(json_path):
+                with open(json_path, encoding="utf-8") as f:
+                    pages = json.load(f)
+                json_items, _ = extract_items_json(pages)
+                json_items = filter_duplicates_by_info(json_items)
+                file_name_json = get_file_title_from_path(json_path)
+            else:
+                print(f"JSON não encontrado: {json_path}")
+                continue
+
+            if not os.path.exists(os.path.join("..", "result")):
+                print("Criando pasta de resultados...")
+
+            os.makedirs(os.path.join("..", "result"), exist_ok=True)
+
+            base_name = os.path.splitext(os.path.basename(json_path))[0]
+            excel_out_path = os.path.join("..", "result", f"{base_name}.xlsx")
+
+            txt_file = os.path.join("..", "result", f"{base_name}.txt")
+
+            export_rows = []
+            for idx, item in enumerate(json_items, 1):
+                export_rows.append({
+                    "Item": idx,
+                    "Página": item.get("page", "N/A"),
+                    "Quantidade": item.get("Quantidade", ""),
+                    "Valores corretos": item.get("Valores corretos", ""),
+                    "Possiveis valores": item.get("Possiveis valores", ""),
+                    "Conteúdo total": item.get("Conteúdo total", ""),
+                })
+
+    #----------------------------------------------------------------------------------------------------------------------------------
+    #----------------------------------------------------------Teste-Zone--------------------------------------------------------------
+
+            # ---------------- Imprime os dados num txt para melhor análise de dados ----------------
+            # Contador automático de execuções
+            # Agrupa itens por página para imprimir uma vez por página
+            items_by_page = defaultdict(list)
+            for idx, item in enumerate(json_items, 1):
+                items_by_page[item.get('page', 'N/A')].append((idx, item))
+
+            
+            txt_out_path = os.path.join("..", "result", f"{base_name}.txt")
+            with open(txt_out_path, "w", encoding="utf-8") as txt_file:
+                txt_file.write(f"Versão: {counter}\n\n")
+                #txt_file.write(f"Cuidado!!!\n")
+                #txt_file.write(f"A Informação pode estar incompleta ou incorreta.\n")
+                #txt_file.write(f"Precauções:.\n")
+                #txt_file.write(f"O campo (Valores corretos) pode ter valores a mais.\n")
+                #txt_file.write(f"O campo (Possíveis valores) pode estar incompleto ou misturar valores.\n")
+                #txt_file.write(f"O campo (Conteúdo total) pode pode ter valores a mais e misturar valores.\n")
+                for page in sorted(items_by_page):
+                    txt_file.write(f"Página {page}:\n")
+                    for idx, item in items_by_page[page]:
+                        txt_file.write(f"  Item: {idx}\n")
+                        txt_file.write(f"    Quantidade: {item.get('Quantidade', '')}\n")
+                        txt_file.write(f"    Valores da linha: {item.get('Valores da linha', '')}\n")
+                        txt_file.write(f"    Possiveis valores: {item.get('Possiveis valores', '')}\n")
+                        txt_file.write(f"    Conteúdo total: {item.get('Conteúdo total', '')}\n")
+                        txt_file.write("-" * 40 + "\n")
+
+            df_export = pd.DataFrame(export_rows)
+            df_export.to_excel(excel_out_path, index=False)
+            print(f"\nResultados exportados para {excel_out_path}")
+
+
+        except Exception as e:
+            print(f"Ocorreu um erro ao processar {json_file}: {e}")
+            erro_ocorrido = True        
+    #-------------------------------------------------------------------------------------------
+    # ---------------- Imprime os dados todos comparando com o json com o excel ----------------
 
     #print(f"\n--- Resultados do ficheiro {file_name_json}: ---")
     #print(f"Total de itens: {len(json_items)}")
@@ -411,26 +515,14 @@ def main():
     #    info = item.get('Informacao', 'N/A')
     #    print(f"  Quantidade: {quant}, Informação: {info}")
 
-    os.makedirs(os.path.join("..", "result"), exist_ok=True)
+    #---------------------------------------------------------
+    # ---------------- Confirma se houve erro ----------------
 
-    # Nome base do ficheiro (sem extensão)
-    base_name = os.path.splitext(os.path.basename(json_path))[0]
-    excel_out_path = os.path.join("..", "result", f"{base_name}.xlsx")
-
-    # Preparar dados para exportação
-    export_rows = []
-    for idx, item in enumerate(json_items, 1):
-        export_rows.append({
-            "Nº": idx,
-            "Página": item.get("page", "N/A"),
-            "Quantidade": item.get("Quantidade", ""),
-            "Valores corretos": item.get("Valores corretos", ""),
-            "Possiveis valores": item.get("Possiveis valores", ""),
-            "Conteúdo total": item.get("Conteúdo total", ""),
-        })
-
-    df_export = pd.DataFrame(export_rows)
-    df_export.to_excel(excel_out_path, index=False)
-    print(f"\nResultados exportados para {excel_out_path}")
+    # Só atualiza o contador se tudo der certo
+    if not erro_ocorrido:
+        with open(counter_path, "w", encoding="utf-8") as f:
+            f.write(str(counter))
+#----------------------------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------Show-Main---------------------------------------------------------------
 if __name__ == "__main__":
     main()
