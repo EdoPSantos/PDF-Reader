@@ -249,59 +249,78 @@ def extract_items_pdf(path):
 #----------------------------------------------------------------JSON----------------------------------------------------------------
 
 def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
+    y_margin_line_values = 5
     header_x = None
     header_y = None
+    header_x_1 = None
+    header_y_1 = None
+    quant_names = []
+    quant_cord = []
+    all_words = []
+    json_items = []
     normalized_keywords = [normalize_info(k) for k in QUANTITY_KEYWORDS]
 
-    # Encontrar o cabeçalho
-    for page in pages:
-        for word in page["words"]:
-            if normalize_info(word["text"]) in normalized_keywords:
-                header_x = word["x"]
-                header_y = word["y"]
-                break
-        if header_x is not None:
-            break
-    if header_x is None:
-        print("Cabeçalho Qt não encontrado!")
-        return [], pages
-
-    json_items = []
-    all_words = []
+    # Junta a deteção do cabeçalho e a cópia das palavras com número da página
     for page_num, page in enumerate(pages, 1):
         for word in page["words"]:
             word_copy = dict(word)
             word_copy["page"] = page_num
             all_words.append(word_copy)
 
+            if normalize_info(word["text"]) in normalized_keywords:
+                quant_names.append(word["text"])
+                quant_cord.append({"x": word["x"], "y": word["y"], "page": page_num})
+                if header_x_1 is None:
+                    header_x_1 = word["x"]
+                    header_y_1 = word["y"]
+
     # Agrupar palavras por página e coordenada y (linha)
     lines_by_page = defaultdict(lambda: defaultdict(list))
     for word in all_words:
         lines_by_page[word["page"]][int(round(word["y"]))].append(word)
 
+    quant_cord_by_page = defaultdict(list)
+    for qc in quant_cord:
+        quant_cord_by_page[qc["page"]].append((qc["x"], qc["y"]))
+
     for page in sorted(lines_by_page):
+        qty_lines = []
         lines = lines_by_page[page]
         y_sorted = sorted(lines.keys())
 
+        page_quant_coords = quant_cord_by_page.get(page, [])
+
+        page_coords = [qc for qc in quant_cord if qc["page"] == page]
+        if page_coords:
+            header_x = page_coords[0]["x"]
+            header_y = page_coords[0]["y"]
+        else:
+            header_x = None
+            header_y = None
+
         # Encontrar todas as linhas que têm quantidades
-        qty_lines = []
         for y in y_sorted:
             words_in_line = lines[y]
-            qty_word = next(
-                (word for word in words_in_line
-                 if is_quantity_number(word["text"])
-                 and abs(word["x"] - header_x) <= x_margin
-                 and word["y"] > header_y),
-                None
-            )
-            if qty_word:
-                qty_lines.append(y)
-
+            # Para cada coordenada de quantidade nesta página
+            for qx, qy in page_quant_coords:
+                qty_num = next(
+                    (word for word in lines[y]
+                    if is_quantity_number(word["text"])
+                    and abs(word["x"] - header_x) <= x_margin
+                    and word["y"] > header_y),
+                    None
+                )
+                if qty_num:
+                    qty_lines.append(y)
+                    break  # Só precisa de um match por linha
         if not qty_lines:
             continue
 
         # Para cada quantidade, apanha a linha + as N linhas abaixo, sem apanhar a próxima quantidade
         for idx, y in enumerate(qty_lines):
+            line_words = []
+            possible_value_words = []
+            block_lines = []
             # Descobre até onde pode apanhar (sem incluir próxima quantidade)
             if idx + 1 < len(qty_lines):
                 next_qty_y = qty_lines[idx + 1]
@@ -312,9 +331,8 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
                 block_ys = [yy for yy in y_sorted if y <= yy]
             
             # Adiciona margem em y para capturar mais informação em line_values
-            y_margin_line_values = 5  # ajuste conforme necessário
             line_ys = [yy for yy in y_sorted if abs(yy - y) <= y_margin_line_values]
-            line_words = []
+            
             for yy in line_ys:
                 line_words.extend(lines[yy])
             line_words_sorted = sort_items_by_key(line_words, "x")
@@ -322,37 +340,31 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
             
             # ------------------------------------------- ALTERAR -------------------------------------------
             # Atualmente procura linhas expecificas, mas o valor deve ser procurado atravez da subtração dos valores do "line_values"
-            possible_value_words = []
+            
             for yy in valid_correct_ys:
                 possible_value_words.extend(lines[yy])
             possible_value_words_sorted = sort_items_by_key(possible_value_words, "x")
             possible_values = join_line_texts(possible_value_words_sorted)
             # -----------------------------------------------------------------------------------------------
 
-            # Quantidade
-            qty_word = next(
+            qty_num = next(
                 (word for word in lines[y]
-                 if is_quantity_number(word["text"])
-                 and abs(word["x"] - header_x) <= x_margin
-                 and word["y"] > header_y),
+                if is_quantity_number(word["text"])
+                and abs(word["x"] - header_x) <= x_margin
+                and word["y"] > header_y),
                 None
             )
-            target_quantity = normalize_quantity(qty_word["text"]) if qty_word else ""
+            target_quantity = normalize_quantity(qty_num["text"]) if qty_num else ""
 
-            block_lines = []
             for yy in block_ys:
                 block_lines.extend(lines[yy])
             block_lines = sort_items_by_key(block_lines, "x")
             full_content = join_line_texts(block_lines)
-
-            # Adiciona todas as quantidades identificadas na página
-            quantidades_encontradas = []
-            for yy in y_sorted:
-                for word in lines[yy]:
-                    if is_quantity_number(word["text"]):
-                        quantidades_encontradas.append(normalize_quantity(word["text"]))
+            
             # Guarda o item
             json_items.append({
+                "Keywords quantidade": quant_names,
+                "Quantidades coordenadas": quant_cord,
                 "Quantidade": target_quantity,
                 "Valores da linha": line_values,
                 "Possiveis valores": possible_values,
@@ -361,7 +373,7 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
                 "y": y
             })
 
-    return json_items, pages
+    return json_items
 
 #----------------------------------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------Main-----------------------------------------------------------------
@@ -433,7 +445,7 @@ def main():
             if os.path.exists(json_path):
                 with open(json_path, encoding="utf-8") as f:
                     pages = json.load(f)
-                json_items, _ = extract_items_json(pages)
+                json_items = extract_items_json(pages)
                 json_items = filter_duplicates_by_info(json_items)
                 file_name_json = get_file_title_from_path(json_path)
             else:
@@ -475,6 +487,10 @@ def main():
             txt_out_path = os.path.join("..", "result", f"{base_name}.txt")
             with open(txt_out_path, "w", encoding="utf-8") as txt_file:
                 txt_file.write(f"Versão: {counter}\n\n")
+                if json_items:
+                    txt_file.write(f"Keywords de quantidade encontradas: {', '.join(json_items[0].get('Keywords quantidade', []))}\n\n")
+                    txt_file.write(f"Quantidades coordenadas: {', '.join(str(coord) for coord in json_items[0].get('Quantidades coordenadas', []))}\n\n")
+
                 #txt_file.write(f"Cuidado!!!\n")
                 #txt_file.write(f"A Informação pode estar incompleta ou incorreta.\n")
                 #txt_file.write(f"Precauções:.\n")
@@ -494,7 +510,6 @@ def main():
             df_export = pd.DataFrame(export_rows)
             df_export.to_excel(excel_out_path, index=False)
             print(f"\nResultados exportados para {excel_out_path}")
-
 
         except Exception as e:
             print(f"Ocorreu um erro ao processar {json_file}: {e}")
