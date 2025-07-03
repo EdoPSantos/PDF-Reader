@@ -268,7 +268,6 @@ def main():
                 with open(json_path, encoding="utf-8") as f:
                     pages = json.load(f)
                 json_items = extract_items_json(pages)
-                file_name_json = get_file_title_from_path(json_path)
             else:
                 print(f"JSON não encontrado: {json_path}")
                 continue

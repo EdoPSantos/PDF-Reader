@@ -11,8 +11,10 @@ def extract_words_with_rotation(page):
         for line in block["lines"]:
             for span in line["spans"]:
                 angle = span.get("angle", 0)
-                if abs(angle) > 5:
-                    continue  # Ignora palavras inclinadas/verticais
+                width = span["bbox"][2] - span["bbox"][0]
+                height = span["bbox"][3] - span["bbox"][1]
+                if height > 3 * width or abs(angle) > 5:
+                    continue  # Ignora possível texto vertical
                 word_list.append({
                     "text": span["text"],
                     "x": span["bbox"][0],
