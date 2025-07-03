@@ -80,17 +80,19 @@ def filter_new_words_ordered(words_sorted, *texts_to_exclude):
 #------------------------------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------JSON----------------------------------------------------------------
 
-def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
+def extract_items_json(pages, y_margin_possible_values=None):
     y_margin_line_values = 5
-    header_x = None
-    header_y = None
     header_x_1 = None
     header_y_1 = None
+    header_width = None
     quant_names = []
     quant_cord = []
     all_words = []
     json_items = []
     normalized_keywords = [normalize_info(k) for k in QUANTITY_KEYWORDS]
+
+    # -----------------------------------------------------------------------------------------------
+    # ------------------------------------- Guardar Info Headers ------------------------------------
 
     # Junta a deteção do cabeçalho e a cópia das palavras com número da página
     for page_num, page in enumerate(pages, 1):
@@ -101,10 +103,17 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
 
             if normalize_info(word["text"]) in normalized_keywords:
                 quant_names.append(word["text"])
-                quant_cord.append({"x": word["x"], "y": word["y"], "page": page_num})
+                quant_cord.append({"x": word["x"],
+                                    "y": word["y"],
+                                    "width": word.get("width", 0),
+                                    "page": page_num})    
                 if header_x_1 is None:
                     header_x_1 = word["x"]
                     header_y_1 = word["y"]
+                    header_width = word.get("width", 0)
+
+    # -----------------------------------------------------------------------------------------------
+    # ---------------------------------------- Organizar Valores ------------------------------------
 
     # Agrupar palavras por página e coordenada y (linha)
     lines_by_page = defaultdict(lambda: defaultdict(list))
@@ -121,49 +130,69 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
         lines = lines_by_page[page]
         y_sorted = sorted(lines.keys())
 
-        page_quant_coords = quant_cord_by_page.get(page, [])
+        # -----------------------------------------------------------------------------------------------
+        # -------------------------------------- Guardar Coordenadas ------------------------------------
 
         page_coords = [qc for qc in quant_cord if qc["page"] == page]
-        if page_coords:
-            header_x = page_coords[0]["x"]
-            header_y = page_coords[0]["y"]
-        else:
-            header_x = None
-            header_y = None
+        
+        # -----------------------------------------------------------------------------------------------
+        # ------------------------------------- Procura y dos Valores -----------------------------------
 
         # Encontrar todas as linhas que têm quantidades
         for y in y_sorted:
             words_in_line = lines[y]
-            # Para cada coordenada de quantidade nesta página
-            for qx, qy in page_quant_coords:
-                qty_num = next(
-                    (word for word in lines[y]
-                    if is_quantity_number(word["text"])
-                    and abs(word["x"] - header_x) <= x_margin
-                    and word["y"] > header_y),
-                    None
+            qty_num = next(
+                (word for word in words_in_line
+                if is_quantity_number(word["text"])
+                and any(
+                    qc["x"] <= word["x"] <= qc["x"] + qc.get("width", 0)
+                    for qc in page_coords
                 )
-                if qty_num:
-                    qty_lines.append(y)
-                    break  # Só precisa de um match por linha
+                and word["y"] > min(qc["y"] for qc in page_coords)  # usa o menor y dos headers
+                ),
+                None
+            )
+            if qty_num:
+                qty_lines.append(y)
         if not qty_lines:
             continue
+        
+        # -----------------------------------------------------------------------------------------------
+        # ----------------------------------------- Define Margens --------------------------------------
+
+        # Calcular Media da Distancia entre Valores
+        if y_margin_possible_values is None:
+            if len(qty_lines) > 1:
+                diffs = [qty_lines[i+1] - qty_lines[i] for i in range(len(qty_lines)-1)]
+                y_margin_possible_values_page = int(sum(diffs) / len(diffs))
+            else:
+                y_margin_possible_values_page = 30  # valor padrão
+        else:
+            y_margin_possible_values_page = y_margin_possible_values
+        
+        # -----------------------------------------------------------------------------------------------
 
         # Para cada quantidade, apanha a linha + as N linhas abaixo, sem apanhar a próxima quantidade
         for idx, y in enumerate(qty_lines):
             line_words = []
             possible_value_words = []
             block_lines = []
+
+            # -----------------------------------------------------------------------------------------------
+            # ---------------------------------- Range para Recolha de Info ---------------------------------
+
             # Descobre até onde pode apanhar (sem incluir próxima quantidade)
             if idx + 1 < len(qty_lines):
                 next_qty_y = qty_lines[idx + 1]
-                valid_correct_ys = [yy for yy in y_sorted if y < yy < next_qty_y and (yy - y) <= y_margin_possible_values]
+                valid_correct_ys = [yy for yy in y_sorted if y < yy < next_qty_y and (yy - y) <= y_margin_possible_values_page]
                 block_ys = [yy for yy in y_sorted if y <= yy < next_qty_y]
             else:
-                valid_correct_ys = [yy for yy in y_sorted if yy > y and (yy - y) <= y_margin_possible_values]
+                valid_correct_ys = [yy for yy in y_sorted if yy > y and (yy - y) <= y_margin_possible_values_page]
                 block_ys = [yy for yy in y_sorted if yy >= y]
 
-            
+            # -----------------------------------------------------------------------------------------------
+            # -------------------------------------- Linhas dos Valores -------------------------------------
+
             # Adiciona margem em y para capturar mais informação em line_values
             line_ys = [yy for yy in y_sorted if abs(yy - y) <= y_margin_line_values]
             
@@ -172,10 +201,8 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
             line_words_sorted = sort_items_by_key(line_words, "x")
             line_values = join_line_texts(line_words_sorted)
             
-            # ------------------------------------------- ALTERAR -------------------------------------------
-
-            for yy in valid_correct_ys:
-                possible_value_words.extend(lines[yy])
+            # -----------------------------------------------------------------------------------------------
+            # --------------------------------------- Possíveis Valores -------------------------------------
 
             # Junta todas as linhas dentro da margem vertical
             for yy in valid_correct_ys:
@@ -192,22 +219,32 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
                 last_possible_values = all_text
 
             # -----------------------------------------------------------------------------------------------
+            # ------------------------------------------ Quantidades ----------------------------------------
 
-
-
+            # ------------------- Falta procurar a quantidade pela sua largura x + "width"
             qty_num = next(
                 (word for word in lines[y]
                 if is_quantity_number(word["text"])
-                and abs(word["x"] - header_x) <= x_margin
-                and word["y"] > header_y),
+                and any(
+                    qc["x"] <= word["x"] <= qc["x"] + qc.get("width", 0)
+                    for qc in page_coords
+                )
+                and word["y"] > min(qc["y"] for qc in page_coords)
+                ),
                 None
             )
             target_quantity = normalize_quantity(qty_num["text"]) if qty_num else ""
 
+            # -----------------------------------------------------------------------------------------------
+            # ---------------------------------------- Todos os Valores -------------------------------------
+            
             for yy in block_ys:
                 block_lines.extend(lines[yy])
             block_lines = sort_items_by_key(block_lines, "x")
             full_content = join_line_texts(block_lines)
+
+            # -----------------------------------------------------------------------------------------------
+            # ----------------------------------------- Guarda Valores ---------------------------------------
 
             # Guarda o item
             json_items.append({
@@ -220,8 +257,7 @@ def extract_items_json(pages, x_margin=20, y_margin_possible_values=30):
                 "page": page,
                 "y": y,
             })
-
-            print
+            
             #print(f"Item adicionado: {json_items[-1]}")
 
     return json_items
@@ -326,7 +362,7 @@ def main():
                         txt_file.write(f"    Quantidade: {item.get('Quantidade', '')}\n")
                         txt_file.write(f"    Valores da linha: {item.get('Valores da linha', '')}\n")
                         txt_file.write(f"    Possiveis valores: {item.get('Possiveis valores', '')}\n")
-                        txt_file.write(f"    Conteúdo total: {item.get('Conteúdo total', '')}\n")
+                        txt_file.write(f"    Conteúdo total (Dividido por itens): {item.get('Conteúdo total', '')}\n")
                         txt_file.write("-" * 40 + "\n")
 
             df_export = pd.DataFrame(export_rows)
