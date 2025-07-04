@@ -5,17 +5,26 @@ Este projeto tem como objetivo automatizar a extração e organização de dados
 ## Organização do Projeto
 
 pdf_reader/
-├── src/ # Código principal da aplicação
-├── tests/ # Scripts de teste e experimentação
-├── excels_from_pdf/ # Resultados: ficheiros Excel extraídos dos PDFs
-├── excels_visual/ # Ficheiros Excel gerados a partir dos JSONs
-├── jsons/ # Ficheiros JSON gerados a partir dos PDFs
-├── pdfs/ # PDFs de entrada
-├── notepads/ # Ficheiros txt gerados a partir dos PDFs
-├── package.json
-├── package-lock.json
-├── .gitignore
-├── README.md
+├── src/                    # Código principal da aplicação
+│
+├── tests/                 # Scripts de teste e experimentação
+│   └── src_v1/            # Primeira versão do projeto (legado ou protótipo inicial)
+│                  
+├── pdfs/                  # PDFs de entrada
+│
+├── jsons/                 # Resultado: Ficheiros JSON gerados a partir dos PDFs
+├── excels_raw/            # Resultado: Excel gerado diretamente dos PDFs
+├── excels_processed/      # Resultado: Excel gerado a partir dos JSONs processados
+├── notepads/              # Resultado: Ficheiros .txt gerados dos PDFs (textosimples)
+│
+│                          # OBS: Estas pastas de "Resultado" não existem inicialmente,
+│                          #      mas são criadas automaticamente quando o projeto é executado.
+│
+├── .gitignore             # Ficheiros/pastas a ignorar no controlo de versões (Git)
+├── package.json           # Dependências e scripts do projeto Node.js
+├── package-lock.json      # Versões exatas das dependências instaladas
+└── README.md              # Documentação inicial do projeto
+
 
 ### Descrição das Pastas
 
@@ -48,9 +57,11 @@ pdf_reader/
 
 4. Corre os scripts principais que estão em src/ conforme a tua necessidade:
 
-    - pdf_to_json.py: Para converter PDF em JSON
+    - pdf_to_json.py: Responsável por converter os ficheiros PDF em ficheiros JSON.
 
-    - json_to_excel.py: Para converter JSON em Excel
+    - json_reader.py: Responsável por ler os ficheiros JSON e extrair as informações relevantes.
+
+    - auto_reader.py: Executa automaticamente os processos de conversão e leitura combinando os dois ficheiros anteriores.
 
 5. Os resultados serão gravados nas respetivas pastas de saída.
 
@@ -74,4 +85,5 @@ pdf_reader/
     - python -m venv plumber_env
     - source plumber_env/bin/activate  # ou plumber_env\Scripts\activate no Windows
     - pip install -r requirements.txt  # (se tiveres este ficheiro)
-    
+
+**Última atualização:** 04 de julho de 2025

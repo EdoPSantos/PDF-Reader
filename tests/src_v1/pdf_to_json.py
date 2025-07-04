@@ -38,6 +38,7 @@ def process_pdf(pdf_path, output_path):
         })
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(pages, f, indent=2, ensure_ascii=False)
+    print(f"Exportado: {output_path}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

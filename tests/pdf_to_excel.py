@@ -2,7 +2,7 @@ import os
 import pdfplumber
 import pandas as pd
 
-input_folder = "pdfs"
+input_folder = "../pdfs"
 output_folder = "excels_from_pdf"
 os.makedirs(output_folder, exist_ok=True)
 

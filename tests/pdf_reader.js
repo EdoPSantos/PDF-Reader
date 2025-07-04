@@ -4,7 +4,7 @@ const pdfParse = require("pdf-parse");
 const readline = require("readline");
 const PDFParser = require("pdf2json");
 
-const folderPath = "./pdfs";
+const folderPath = "../pdfs";
 
 const rl = readline.createInterface({
   input: process.stdin,

@@ -1,7 +1,7 @@
 import os
 import pdfplumber
 
-input_folder = "pdfs"
+input_folder = "../pdfs"
 output_folder = "notepads"
 os.makedirs(output_folder, exist_ok=True)
 

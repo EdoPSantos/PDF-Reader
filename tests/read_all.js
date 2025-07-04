@@ -2,7 +2,7 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 
 // Caminho para o PDF atual
-const pathPDF = "../test_pdfs/opcao3.PDF";
+const pathPDF = "../pdfs/opcao3.PDF";
 const buffer = fs.readFileSync(pathPDF);
 
 pdfParse(buffer).then(function (data) {

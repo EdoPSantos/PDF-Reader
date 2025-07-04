@@ -5,7 +5,7 @@ from watchdog.events import FileSystemEventHandler
 import subprocess
 import sys
 
-PDF_INPUT_FOLDER = os.path.abspath("../pdfs")
+PDF_INPUT_FOLDER = os.path.abspath("../../pdfs")
 JSON_OUTPUT_FOLDER = os.path.abspath("../jsons")
 EXCEL_OUTPUT_FOLDER = os.path.abspath("../excels_visual")
 

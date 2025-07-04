@@ -1,9 +1,14 @@
 import os
-import pandas as pd
 import re
-import unicodedata
 import json
 import string
+import unicodedata
+import pandas as pd
+from collections import defaultdict
+
+
+import pandas as pd
+import json
 from collections import defaultdict
 
 try:
@@ -82,11 +87,8 @@ def filter_new_words_ordered(words_sorted, *texts_to_exclude):
 
 def extract_items_json(pages, y_margin_possible_values=None):
     y_margin_line_values = 5
-    header_x_1 = None
-    header_y_1 = None
-    header_width = None
-    quant_names = []
-    quant_cord = []
+    header_names = []
+    header_cord = []
     all_words = []
     json_items = []
     normalized_keywords = [normalize_info(k) for k in QUANTITY_KEYWORDS]
@@ -102,15 +104,13 @@ def extract_items_json(pages, y_margin_possible_values=None):
             all_words.append(word_copy)
 
             if normalize_info(word["text"]) in normalized_keywords:
-                quant_names.append(word["text"])
-                quant_cord.append({"x": word["x"],
+                header_names.append(word["text"])
+                header_cord.append({"x": word["x"],
                                     "y": word["y"],
                                     "width": word.get("width", 0),
-                                    "page": page_num})    
-                if header_x_1 is None:
-                    header_x_1 = word["x"]
-                    header_y_1 = word["y"]
-                    header_width = word.get("width", 0)
+                                    "page": page_num,
+                                    "text": word["text"]
+                                    })
 
     # -----------------------------------------------------------------------------------------------
     # ---------------------------------------- Organizar Valores ------------------------------------
@@ -120,9 +120,9 @@ def extract_items_json(pages, y_margin_possible_values=None):
     for word in all_words:
         lines_by_page[word["page"]][int(round(word["y"]))].append(word)
 
-    quant_cord_by_page = defaultdict(list)
-    for qc in quant_cord:
-        quant_cord_by_page[qc["page"]].append((qc["x"], qc["y"]))
+    header_cord_by_page = defaultdict(list)
+    for qc in header_cord:
+        header_cord_by_page[qc["page"]].append((qc["x"], qc["y"]))
 
     for page in sorted(lines_by_page):
         qty_lines = []
@@ -133,26 +133,42 @@ def extract_items_json(pages, y_margin_possible_values=None):
         # -----------------------------------------------------------------------------------------------
         # -------------------------------------- Guardar Coordenadas ------------------------------------
 
-        page_coords = [qc for qc in quant_cord if qc["page"] == page]
+        headers_coords = [qc for qc in header_cord if qc["page"] == page]
         
         # -----------------------------------------------------------------------------------------------
         # ------------------------------------- Procura y dos Valores -----------------------------------
 
-        # Encontrar todas as linhas que têm quantidades
+        # Encontrar todas as linhas que têm quantidades (nova abordagem)
         for y in y_sorted:
             words_in_line = lines[y]
-            qty_num = next(
-                (word for word in words_in_line
-                if is_quantity_number(word["text"])
-                and any(
-                    qc["x"] <= word["x"] <= qc["x"] + qc.get("width", 0)
-                    for qc in page_coords
-                )
-                and word["y"] > min(qc["y"] for qc in page_coords)  # usa o menor y dos headers
-                ),
-                None
-            )
-            if qty_num:
+            matching_words = []
+
+            header_ranges = []
+            for c in headers_coords:
+                x_start = int(round(c["x"]))
+                x_end = int(round(c["x"] + c.get("width", 0)))
+                y_value = c["y"]
+
+                header_ranges.append({
+                    "x_range": set(range(x_start, x_end + 1)),
+                    "y": y_value,
+                    "text": c.get("text", "")
+                })
+
+            for word in words_in_line:
+                word_x_range = set(range(
+                    int(round(word["x"])),
+                    int(round(word["x"] + word.get("width", 0))) + 1
+                ))
+                word_y = word["y"]
+
+                for header in header_ranges:
+                    if word_x_range & header["x_range"] and word_y > header["y"]:
+                        if is_quantity_number(word["text"]):
+                            matching_words.append(word)
+                            break
+
+            if matching_words:
                 qty_lines.append(y)
         if not qty_lines:
             continue
@@ -177,6 +193,8 @@ def extract_items_json(pages, y_margin_possible_values=None):
             line_words = []
             possible_value_words = []
             block_lines = []
+            header_ranges = []
+            matching_words = []
 
             # -----------------------------------------------------------------------------------------------
             # ---------------------------------- Range para Recolha de Info ---------------------------------
@@ -219,21 +237,35 @@ def extract_items_json(pages, y_margin_possible_values=None):
                 last_possible_values = all_text
 
             # -----------------------------------------------------------------------------------------------
-            # ------------------------------------------ Quantidades ----------------------------------------
+            # ------------------------------------- Quantidades-Valores -------------------------------------
 
-            # ------------------- Falta procurar a quantidade pela sua largura x + "width"
-            qty_num = next(
-                (word for word in lines[y]
-                if is_quantity_number(word["text"])
-                and any(
-                    qc["x"] <= word["x"] <= qc["x"] + qc.get("width", 0)
-                    for qc in page_coords
-                )
-                and word["y"] > min(qc["y"] for qc in page_coords)
-                ),
-                None
-            )
-            target_quantity = normalize_quantity(qty_num["text"]) if qty_num else ""
+            for c in headers_coords:
+                x_start = int(round(c["x"]))
+                x_end = int(round(c["x"] + c.get("width", 0)))
+                y_value = c["y"]
+
+                header_ranges.append({
+                    "x_range": set(range(x_start, x_end + 1)),
+                    "y": y_value,
+                    "text": c.get("text", "")
+                })
+
+            for word in lines[y]:
+                word_x_range = set(range(
+                    int(round(word["x"])),
+                    int(round(word["x"] + word.get("width", 0))) + 1
+                ))
+                word_y = word["y"]
+
+                for header in header_ranges:
+                    # Verifica se há intersecção no X E se está abaixo no Y
+                    if word_x_range & header["x_range"] and word_y > header["y"]:
+                        matching_words.append(word)
+                        break  # Já pertence a um header, não precisa testar os outros
+
+            matching_words = sort_items_by_key(matching_words, "y")
+            target_quantities = [normalize_quantity(word["text"]) for word in matching_words]
+            target_quantity = " ".join(target_quantities)
 
             # -----------------------------------------------------------------------------------------------
             # ---------------------------------------- Todos os Valores -------------------------------------
@@ -248,28 +280,24 @@ def extract_items_json(pages, y_margin_possible_values=None):
 
             # Guarda o item
             json_items.append({
-                "Keywords quantidade": quant_names,
-                "Quantidades coordenadas": quant_cord,
-                "Quantidade": target_quantity,
-                "Valores da linha": line_values,
-                "Possiveis valores": possible_values,
-                "Conteúdo total": full_content,
+                "Quantity": target_quantity,
+                "Line Values": line_values,
+                "Possible Values": possible_values,
+                "Full Content": full_content,
                 "page": page,
                 "y": y,
             })
-            
-            #print(f"Item adicionado: {json_items[-1]}")
 
     return json_items
 
 #----------------------------------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------Main-----------------------------------------------------------------
 def main():
-    
     #------------------------------------------------------------------------
     # ------------------------------- 3. JSON -------------------------------
 
     jsons_folder = "../jsons"
+    result_folder = os.path.join("..", "result")
     if not os.path.exists(jsons_folder):
         print("Pasta JSONs não encontrada.")
         return
@@ -278,24 +306,13 @@ def main():
         print("Nenhum ficheiro JSON encontrado na pasta.")
         return
 
-    #-------------------------------------------------------------------------
-    # --------------------------- Imprime a Versão ---------------------------
-    # Calcule o contador antes do loop
-    counter_path = os.path.join("..", "result", "contador.txt")
-    if os.path.exists(counter_path):
-        with open(counter_path, "r", encoding="utf-8") as f:
-            try:
-                counter = int(f.read().strip())
-            except Exception:
-                counter = 0
-    else:
-        counter = 0
-    counter += 1
+    # Create result directory once
+    result_folder = os.path.join("..", "result")
+    os.makedirs(result_folder, exist_ok=True)
 
-    erro_ocorrido = False
-
-    #________________________________________________________________________
+    #------------------------------------------------------------------------
     # ------------------------ Ciclo de Processamento -----------------------
+
     for json_file in json_files:
         try:
             json_path = os.path.join(jsons_folder, json_file)
@@ -308,33 +325,13 @@ def main():
                 print(f"JSON não encontrado: {json_path}")
                 continue
 
-            if not os.path.exists(os.path.join("..", "result")):
-                print("Criando pasta de resultados...")
-
-            os.makedirs(os.path.join("..", "result"), exist_ok=True)
-
             base_name = os.path.splitext(os.path.basename(json_path))[0]
-            excel_out_path = os.path.join("..", "result", f"{base_name}.xlsx")
+            excel_out_path = os.path.join(result_folder, f"{base_name}.xlsx")
 
-            txt_file = os.path.join("..", "result", f"{base_name}.txt")
-
-            export_rows = []
-            for idx, item in enumerate(json_items, 1):
-                export_rows.append({
-                    "Item": idx,
-                    "Página": item.get("page", "N/A"),
-                    "Quantidade": item.get("Quantidade", ""),
-                    "Valores corretos": item.get("Valores corretos", ""),
-                    "Possiveis valores": item.get("Possiveis valores", ""),
-                    "Conteúdo total": item.get("Conteúdo total", ""),
-                })
-
-            #--------------------------------------------------------------------------------------------
-            #--------------------------------------- Teste-Zone -----------------------------------------
-
-            # ---------------- Imprime os dados num txt para melhor análise de dados ----------------
-            # Contador automático de execuções
-            # Agrupa itens por página para imprimir uma vez por página
+            #-----------------------------------------------------------------------
+            #------------------------------ Items Value ----------------------------
+           
+            total_items = len(json_items)
             items_by_page = defaultdict(list)
             for idx, item in enumerate(json_items, 1):
                 page = item.get('page', 'N/A')
@@ -342,44 +339,47 @@ def main():
                     page = int(page)
                 except Exception:
                     pass
-                items_by_page[page].append((idx, item))
+                items_by_page[page].append(item)
 
+            #-----------------------------------------------------------------------
+            #------------------------------- Statistics ----------------------------
             
-            txt_out_path = os.path.join("..", "result", f"{base_name}.txt")
-            with open(txt_out_path, "w", encoding="utf-8") as txt_file:
-                txt_file.write(f"Versão: {counter}\n\n")
-                #txt_file.write(f"Cuidado!!!\n")
-                #txt_file.write(f"A Informação pode estar incompleta ou incorreta.\n")
-                #txt_file.write(f"Precauções:.\n")
-                #txt_file.write(f"O campo (Valores corretos) pode ter valores a mais.\n")
-                #txt_file.write(f"O campo (Possíveis valores) pode estar incompleto ou misturar valores.\n")
-                #txt_file.write(f"O campo (Conteúdo total) pode pode ter valores a mais e misturar valores.\n")
-                print("Páginas agrupadas:", list(items_by_page.keys()))
-                for page in sorted(items_by_page, key=lambda x: (isinstance(x, int), x)):
-                    txt_file.write(f"Página {page}:\n")
-                    for idx, item in items_by_page[page]:
-                        txt_file.write(f"  Item: {idx}\n")
-                        txt_file.write(f"    Quantidade: {item.get('Quantidade', '')}\n")
-                        txt_file.write(f"    Valores da linha: {item.get('Valores da linha', '')}\n")
-                        txt_file.write(f"    Possiveis valores: {item.get('Possiveis valores', '')}\n")
-                        txt_file.write(f"    Conteúdo total (Dividido por itens): {item.get('Conteúdo total', '')}\n")
-                        txt_file.write("-" * 40 + "\n")
+            resumo_rows = []
+            resumo_rows.append(["Página", "Produtos"])
+            for page in sorted(items_by_page):
+                resumo_rows.append([f"Pag: {page}", len(items_by_page[page])])
+            resumo_rows.append(["Total Produtos", total_items])
 
-            df_export = pd.DataFrame(export_rows)
-            df_export.to_excel(excel_out_path, index=False)
-            print(f"\nResultados exportados para {excel_out_path}")
+            #-----------------------------------------------------------------------
+            #------------------------------- Main Info -----------------------------
+
+            detalhes_rows = []
+            for page in sorted(items_by_page):
+                detalhes_rows.append([f"Pag: {page}"])
+                detalhes_rows.append(["Quantidade", "Valores da linha", "Possiveis valores", "Conteúdo total"])
+                for item in items_by_page[page]:
+                    detalhes_rows.append([
+                        item.get("Quantity", ""),
+                        item.get("Line Values", ""),
+                        item.get("Possible Values", ""),
+                        item.get("Full Content", "")
+                    ])
+                detalhes_rows.append([])
+
+            #-----------------------------------------------------------------------
+            #------------------------- Statistics + Main Info ----------------------
+            
+            all_rows = resumo_rows + [[""]] + detalhes_rows
+
+            #-----------------------------------------------------------------------
+            #------------------------------ Write Excel ----------------------------
+            
+            with pd.ExcelWriter(excel_out_path, engine='xlsxwriter') as writer:
+                df = pd.DataFrame(all_rows)
+                df.to_excel(writer, sheet_name='Itens', index=False, header=False)
 
         except Exception as e:
             print(f"Ocorreu um erro ao processar {json_file}: {e}")
-            erro_ocorrido = True        
-   
-    #-------------------------------------------------------------
-    #___________________ Confirma se houve erro __________________
-
-    # Só atualiza o contador se tudo der certo
-    if not erro_ocorrido:
-        with open(counter_path, "w", encoding="utf-8") as f:
-            f.write(str(counter))
 
 #--------------------------------------------------------------------------------------------
 #---------------------------------------Show-Main--------------------------------------------
