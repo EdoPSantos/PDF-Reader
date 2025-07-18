@@ -91,6 +91,7 @@ def extract_items_json(pages, y_margin_possible_values=None):
     header_cord = []
     all_words = []
     json_items = []
+    fallback_items = []
     normalized_keywords = [normalize_info(k) for k in QUANTITY_KEYWORDS]
 
     # -----------------------------------------------------------------------------------------------
@@ -128,13 +129,14 @@ def extract_items_json(pages, y_margin_possible_values=None):
         qty_lines = []
         last_possible_values = ""
         lines = lines_by_page[page]
+        found_valid_quantity = False
         y_sorted = sorted(lines.keys())
 
         # -----------------------------------------------------------------------------------------------
         # -------------------------------------- Guardar Coordenadas ------------------------------------
 
         headers_coords = [qc for qc in header_cord if qc["page"] == page]
-        
+
         # -----------------------------------------------------------------------------------------------
         # ------------------------------------- Procura y dos Valores -----------------------------------
 
@@ -170,8 +172,69 @@ def extract_items_json(pages, y_margin_possible_values=None):
 
             if matching_words:
                 qty_lines.append(y)
-        if not qty_lines:
-            continue
+
+        # Se não encontrou nenhuma linha de quantidade, faz fallback para todas as palavras do cabeçalho
+        if not found_valid_quantity and headers_coords:
+            # Tenta encontrar o y mais próximo da linha do cabeçalho
+            header_y_raw = headers_coords[0]["y"]
+            header_y = min(lines, key=lambda ly: abs(ly - header_y_raw))
+
+            header_line_words = sort_items_by_key(lines[header_y], "x")
+            header_cols = []
+            for header_word in header_line_words:
+                col_x = int(round(header_word["x"]))
+                col_width = int(round(header_word.get("width", 0)))
+                col_x_range = set(range(col_x, col_x + col_width + 1))
+                header_cols.append({
+                    "text": header_word["text"],
+                    "x_range": col_x_range,
+                    "y": header_word["y"]
+                })
+
+            for y in y_sorted:
+                if y <= header_y:
+                    continue
+                found_cols = []
+                for col in header_cols:
+                    for word in lines[y]:
+                        word_x = int(round(word["x"]))
+                        word_width = int(round(word.get("width", 0)))
+                        word_x_range = set(range(word_x, word_x + word_width + 1))
+                        if word_x_range & col["x_range"]:
+                            found_cols.append(col["text"])
+                            break
+
+                # Permite margem mínima: se pelo menos 2 colunas diferentes foram identificadas
+                if len(set(found_cols)) >= 2:
+                    # Controle de distância entre linhas
+                    if 'last_y' not in locals():
+                        # Primeiro valor após cabeçalho
+                        first_y = y
+                        last_y = y
+                        line_words_sorted = sort_items_by_key(lines[y], "x")
+                        no_line_values = join_line_texts(line_words_sorted)
+                        no_target_quantity = "Não Identificado"
+                        fallback_items.append({
+                            "Quantity":  no_target_quantity,
+                            "All Values": no_line_values,
+                            "page": page,
+                            "y": y,
+                        })
+                    else:
+                        # Para os próximos valores, aplica o filtro de distância
+                        dist_cabecalho_primeiro = abs(first_y - header_y)
+                        dist_entre_valores = abs(y - last_y)
+                        if dist_entre_valores < 2 * dist_cabecalho_primeiro:
+                            last_y = y
+                            line_words_sorted = sort_items_by_key(lines[y], "x")
+                            line_values = join_line_texts(line_words_sorted)
+                            no_target_quantity = "Não Identificado"
+                            fallback_items.append({
+                                "Quantity":  no_target_quantity,
+                                "All Values": no_line_values,
+                                "page": page,
+                                "y": y,
+                            })
         
         # -----------------------------------------------------------------------------------------------
         # ----------------------------------------- Define Margens --------------------------------------
@@ -218,6 +281,24 @@ def extract_items_json(pages, y_margin_possible_values=None):
                 line_words.extend(lines[yy])
             line_words_sorted = sort_items_by_key(line_words, "x")
             line_values = join_line_texts(line_words_sorted)
+
+
+            # -----------------------------------------------------------------------------------------------
+            # ---------------------------------- Identificação de Limites -----------------------------------
+
+            for header in headers_coords:
+                header_y = int(round(header["y"]))
+                if header_y in lines:
+                    header_line_words = sort_items_by_key(lines[header_y], "x")
+                    for i, word in enumerate(header_line_words):
+                        left = header_line_words[i-1] if i > 0 else None
+                        right = header_line_words[i+1] if i < len(header_line_words)-1 else None
+                        left_xw = left["x"] + left.get("width", 0) if left else None
+                        right_xw = right["x"] + right.get("width", 0) if right else None
+
+                        if left_xw is not None and right_xw is not None:
+                            delta_x = right_xw - left_xw
+
             
             # -----------------------------------------------------------------------------------------------
             # --------------------------------------- Possíveis Valores -------------------------------------
@@ -264,12 +345,23 @@ def extract_items_json(pages, y_margin_possible_values=None):
                         break  # Já pertence a um header, não precisa testar os outros
 
             matching_words = sort_items_by_key(matching_words, "y")
-            target_quantities = [normalize_quantity(word["text"]) for word in matching_words]
+            target_quantities = [
+                normalize_quantity(word["text"])
+                for word in matching_words
+                if word.get("width", 0) < delta_x
+            ]
             target_quantity = " ".join(target_quantities)
 
             # -----------------------------------------------------------------------------------------------
-            # ---------------------------------------- Todos os Valores -------------------------------------
+            # ------------------------------------ Todos os Valores Sumados ---------------------------------
             
+            all_words_combined = line_words_sorted + filtered_words
+            all_words_sorted = sort_items_by_key(all_words_combined, "x")
+            all_values = join_line_texts(all_words_sorted)
+
+            # -----------------------------------------------------------------------------------------------
+            # ---------------------------------- Todos os Valores 100% do PDF -------------------------------
+
             for yy in block_ys:
                 block_lines.extend(lines[yy])
             block_lines = sort_items_by_key(block_lines, "x")
@@ -279,16 +371,19 @@ def extract_items_json(pages, y_margin_possible_values=None):
             # ----------------------------------------- Guarda Valores ---------------------------------------
 
             # Guarda o item
-            json_items.append({
-                "Quantity": target_quantity,
-                "Line Values": line_values,
-                "Possible Values": possible_values,
-                "Full Content": full_content,
-                "page": page,
-                "y": y,
-            })
+            if target_quantity.strip():
+                found_valid_quantity = True
+                json_items.append({
+                    "Quantity": target_quantity,
+                    "All Values": all_values,
+                    "page": page,
+                    "y": y,
+                })
 
-    return json_items
+    if json_items:
+        return json_items
+    else:
+        return fallback_items
 
 #----------------------------------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------Main-----------------------------------------------------------------
@@ -343,33 +438,32 @@ def main():
 
             #-----------------------------------------------------------------------
             #------------------------------- Statistics ----------------------------
-            
+            '''
             resumo_rows = []
             resumo_rows.append(["Página", "Produtos"])
             for page in sorted(items_by_page):
                 resumo_rows.append([f"Pag: {page}", len(items_by_page[page])])
             resumo_rows.append(["Total Produtos", total_items])
-
+            '''
             #-----------------------------------------------------------------------
             #------------------------------- Main Info -----------------------------
 
             detalhes_rows = []
+            detalhes_rows.append(["Codigo", "Quantidade", "Observacoes"])
             for page in sorted(items_by_page):
-                detalhes_rows.append([f"Pag: {page}"])
-                detalhes_rows.append(["Quantidade", "Valores da linha", "Possiveis valores", "Conteúdo total"])
+                #detalhes_rows.append([f"Pag: {page}"])
                 for item in items_by_page[page]:
                     detalhes_rows.append([
+                        "",
                         item.get("Quantity", ""),
-                        item.get("Line Values", ""),
-                        item.get("Possible Values", ""),
-                        item.get("Full Content", "")
+                        item.get("All Values", ""),
                     ])
-                detalhes_rows.append([])
+                #detalhes_rows.append([])
 
             #-----------------------------------------------------------------------
             #------------------------- Statistics + Main Info ----------------------
             
-            all_rows = resumo_rows + [[""]] + detalhes_rows
+            all_rows = detalhes_rows
 
             #-----------------------------------------------------------------------
             #------------------------------ Write Excel ----------------------------
