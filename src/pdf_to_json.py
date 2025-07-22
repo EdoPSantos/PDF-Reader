@@ -1,5 +1,5 @@
 import sys
-import fitz  # PyMuPDF
+import fitz
 import json
 
 def extract_words_with_rotation(page):
